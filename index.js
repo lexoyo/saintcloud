@@ -6,6 +6,7 @@ var google = require('googleapis');
 const appengine = google.appengine('v1');                                                                                                                                                                          
 const cloudresourcemanager = google.cloudresourcemanager('v1');                                                                                                                                                                          
 const async = require('async');
+const readline = require('readline');
 
 var key = require('./alex-project-c8277e73fe39.json');                                                                                                                                                                
 var jwtClient = new google.auth.JWT(                                                                                                                                                                               
@@ -16,7 +17,6 @@ var jwtClient = new google.auth.JWT(
   null                                                                                                                                                                                                             
 );                                                                                                                                                                                                                 
         
-
 jwtClient.authorize(function (err, tokens) {
     if (err) {
         console.log(err);
@@ -107,8 +107,81 @@ jwtClient.authorize(function (err, tokens) {
         });
     }
   
-    async.waterfall([getProjects, getServices, getVersions, getInstances], (err, res) => {
-        console.log(JSON.stringify(res, null, 4));
+    console.log("Calling Google APIs...");
+
+    async.waterfall([getProjects, getServices, getVersions, getInstances], (err, projects) => {
+        const versionsWithNoInstance = [];
+
+        projects.forEach(project => {
+            project.services && project.services.forEach(service => {
+                service.versions && service.versions.forEach(version => {
+                    if(!version.instances) {
+                        const age = Date.now() - new Date(version.createTime).getTime();
+                        //FIXME only add versions older than ??? days
+                        versionsWithNoInstance.push({ 
+                            projectId: project.projectId,
+                            serviceId: service.id,
+                            versionId: version.id,
+                            age
+                        });
+                    }
+                });
+            });
+        });
+
+
+        if(versionsWithNoInstance.length > 0) {
+            console.log('Versions with no instances:');
+            versionsWithNoInstance.forEach(v => {
+                console.log(` - project: ${v.projectId}, service: ${v.serviceId}, version: ${v.versionId} (created ${v.age} seconds ago)`);
+            })
+
+            const rl = readline.createInterface({
+                input: process.stdin,
+                output: process.stdout
+            });
+            
+            rl.question('Do you want to delete these versions? (y/N) ', (answer) => {
+                rl.close();
+
+                if(answer === 'Y' || answer === 'y') {
+                    console.log("Deleting versions...");
+                    
+                    const deletionPromises = versionsWithNoInstance.map(v => new Promise((resolve, reject) => {
+                        appengine.apps.services.versions.delete({
+                            appsId: v.projectId,
+                            servicesId: v.serviceId,
+                            versionsId: v.versionId,
+                            auth: jwtClient              
+                        }, (err, resp) => {   
+                            if(err) {
+                                resolve({status: 'error', err, version: v});
+                            } else {
+                                resolve({status: 'success'});
+                            }
+                        });
+                    }));
+
+                    Promise.all(deletionPromises).then(results => {
+                        const successesCount = results.filter(result => result.status === 'success').length;
+                        console.log(`${successesCount} versions successfully deleted`);
+
+                        const errors = results.filter(result => result.status === 'error');
+                        if(errors.length > 0) {
+                            console.log(`${errors.length} errors:`);
+                            errors.forEach(error => {
+                                console.log(` - project: ${error.v.projectId}, service: ${error.v.serviceId}, version: ${error.v.versionId}: ${err}`);
+                            });
+                        }
+                    });
+                    
+                } else {
+                    console.log('Ok, nothing deleted');
+                }
+            });
+        } else {
+            console.log('No versions without instance. Nothing to do...');
+        }
     });
 });
 

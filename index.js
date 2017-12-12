@@ -1,27 +1,35 @@
 // see these links for doc
 // * implementation of the SDK: https://github.com/google/google-api-nodejs-client/blob/master/src/apis/appengine/v1.ts#L1300
 // * credential creation in console: https://console.developers.google.com/apis/credentials
-// * 
-var google = require('googleapis');                                                                                                                                                                                
-const appengine = google.appengine('v1');                                                                                                                                                                          
-const cloudresourcemanager = google.cloudresourcemanager('v1');                                                                                                                                                                          
+// *
+const google = require('googleapis');
+const appengine = google.appengine('v1');
+const cloudresourcemanager = google.cloudresourcemanager('v1');
 const async = require('async');
 const readline = require('readline');
 
-var key = require('./alex-project-c8277e73fe39.json');                                                                                                                                                                
-var jwtClient = new google.auth.JWT(                                                                                                                                                                               
-  key.client_email,                                                                                                                                                                                                
-  null,                                                                                                                                                                                                            
-  key.private_key,                                                                                                                                                                                                 
-  ['https://www.googleapis.com/auth/appengine.admin', 'https://www.googleapis.com/auth/cloud-platform', 'https://www.googleapis.com/auth/cloud-platform.read-only'], // an array of auth scopes                                                                                                                                   
-  null                                                                                                                                                                                                             
-);                                                                                                                                                                                                                 
-        
+// script args
+const [node, script, 
+  projectId=process.env.GCLOUD_PROJECT_ID, 
+  keyFile=process.env.GCLOUD_KEY_FILE || './key.json'
+] = process.argv;
+const key = require(keyFile);
+
+// auth config
+const jwtClient = new google.auth.JWT(
+  key.client_email,
+  null,
+  key.private_key,
+  ['https://www.googleapis.com/auth/appengine.admin', 'https://www.googleapis.com/auth/cloud-platform', 'https://www.googleapis.com/auth/cloud-platform.read-only'], // an array of auth scopes
+  null
+);
+
+// auth now
 jwtClient.authorize(function (err, tokens) {
     if (err) {
         console.log(err);
-        return;                                                                                                                                                                                                        
-    }    
+        return;
+    }
 
     const getProjects = (cb) => {
         cloudresourcemanager.projects.list({
@@ -30,7 +38,8 @@ jwtClient.authorize(function (err, tokens) {
             if(err) {
                 cb("Couldn't retrieve projects", null);
             } else {
-                cb(null, res.projects);
+                if(projectId) cb(null, res.projects.filter(project => project.projectId === projectId));
+                else cb(null, res.projects);
             }
         });
     };
@@ -39,14 +48,14 @@ jwtClient.authorize(function (err, tokens) {
         let pendingRequests = 0;
         projects.forEach(project => {
             pendingRequests++;
-            appengine.apps.services.list({                                                                                                                                                                                   
-                appsId: project.projectId,                                                                                                                                                                                           
-                auth: jwtClient                                                                                                                                                                                                
-              }, (err, resp) => {   
-                pendingRequests--;   
+            appengine.apps.services.list({
+                appsId: project.projectId,
+                auth: jwtClient
+              }, (err, resp) => {
+                pendingRequests--;
                 if(err) {
                     if(err.code != 404) cb(err, null);
-                } else {        
+                } else {
                     project.services = resp.services;
                     if(pendingRequests === 0) {
                         cb(null, projects);
@@ -64,12 +73,12 @@ jwtClient.authorize(function (err, tokens) {
                 appengine.apps.services.versions.list({
                     appsId: project.projectId,
                     servicesId: service.id,
-                    auth: jwtClient              
-                }, (err, resp) => {   
-                    pendingRequests--;   
+                    auth: jwtClient
+                }, (err, resp) => {
+                    pendingRequests--;
                     if(err) {
                         if(err.code != 404) cb(err, null);
-                    } else {        
+                    } else {
                         service.versions = resp.versions;
                         if(pendingRequests === 0) {
                             cb(null, projects);
@@ -90,12 +99,12 @@ jwtClient.authorize(function (err, tokens) {
                         appsId: project.projectId,
                         servicesId: service.id,
                         versionsId: version.id,
-                        auth: jwtClient              
-                    }, (err, resp) => {   
+                        auth: jwtClient
+                    }, (err, resp) => {
                         pendingRequests--;
                         if(err) {
                             if(err.code != 404) cb(err, null);
-                        } else {        
+                        } else {
                             version.instances = resp.instances;
                             if(pendingRequests === 0) {
                                 cb(null, projects);
@@ -106,7 +115,7 @@ jwtClient.authorize(function (err, tokens) {
             });
         });
     }
-  
+
     console.log("Calling Google APIs...");
 
     async.waterfall([getProjects, getServices, getVersions, getInstances], (err, projects) => {
@@ -118,7 +127,7 @@ jwtClient.authorize(function (err, tokens) {
                     if(!version.instances) {
                         const age = Date.now() - new Date(version.createTime).getTime();
                         //FIXME only add versions older than ??? days
-                        versionsWithNoInstance.push({ 
+                        versionsWithNoInstance.push({
                             projectId: project.projectId,
                             serviceId: service.id,
                             versionId: version.id,
@@ -140,20 +149,20 @@ jwtClient.authorize(function (err, tokens) {
                 input: process.stdin,
                 output: process.stdout
             });
-            
+
             rl.question('Do you want to delete these versions? (y/N) ', (answer) => {
                 rl.close();
 
                 if(answer === 'Y' || answer === 'y') {
                     console.log("Deleting versions...");
-                    
+
                     const deletionPromises = versionsWithNoInstance.map(v => new Promise((resolve, reject) => {
                         appengine.apps.services.versions.delete({
                             appsId: v.projectId,
                             servicesId: v.serviceId,
                             versionsId: v.versionId,
-                            auth: jwtClient              
-                        }, (err, resp) => {   
+                            auth: jwtClient
+                        }, (err, resp) => {
                             if(err) {
                                 resolve({status: 'error', err, version: v});
                             } else {
@@ -174,7 +183,7 @@ jwtClient.authorize(function (err, tokens) {
                             });
                         }
                     });
-                    
+
                 } else {
                     console.log('Ok, nothing deleted');
                 }

@@ -1,13 +1,26 @@
 {
-  "name": "remove-old-versions",
+  "name": "saintcloud",
   "version": "1.0.0",
-  "description": "",
+  "description": "A CLI tool with utilities for google cloud platform",
   "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+  "bin": {
+    "saintcloud": "./index.js"
   },
-  "author": "",
-  "license": "ISC",
+  "keywords": [
+    "google",
+    "google cloud",
+    "google cloud platform",
+    "app engine",
+    "google app engine",
+    "manage",
+    "vm",
+    "virtual machine",
+    "version",
+    "instance"
+  ],
+  "author": "Alex Hoyau <a.hoyau@silexlabs.org>",
+  "repository": "lexoyo/saintcloud",
+  "license": "GPL",
   "dependencies": {
     "googleapis": "^23.0.0"
   }

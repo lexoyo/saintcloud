@@ -14,7 +14,7 @@ $ saintcloud
 
 Options:
 - `GCLOUD_PROJECT_ID` or 1st arg: the project ID (default=all projects)
-- `GCLOUD_KEY_FILE` env var or 2nd arg: path to the key file (default=./key.json)
+- `GCLOUD_KEY_FILE` env var or 2nd arg: optional path to the key file (default=open an oauth browser window)
 
 ```
 $ saintcloud $GCLOUD_PROJECT_ID $GCLOUD_KEY_FILE 

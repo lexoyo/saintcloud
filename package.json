@@ -1,10 +1,10 @@
 {
   "name": "saintcloud",
-  "version": "1.0.2",
+  "version": "1.1.0",
   "description": "A CLI tool with utilities for google cloud platform",
-  "main": "index.js",
+  "main": "lib/index.js",
   "bin": {
-    "saintcloud": "./index.js"
+    "saintcloud": "./lib/index.js"
   },
   "keywords": [
     "google",
@@ -22,6 +22,8 @@
   "repository": "lexoyo/saintcloud",
   "license": "GPL",
   "dependencies": {
+    "browser-launcher3": "^0.4.4",
+    "express": "^4.16.2",
     "googleapis": "^23.0.0"
   }
 }
